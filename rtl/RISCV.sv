@@ -114,10 +114,9 @@ module RISCV #(
 
 
 
-	(* ram_block, no_rw_check *)
-	bit[31:0] registers[32];
-
-	bit[31:0] pc = RESET_PC;
+	bit[31:0]
+		registers[32],
+		pc = RESET_PC;
 
 	// PC value override ocurring in the EX stage.
 	bit warp;
@@ -351,7 +350,7 @@ module RISCV #(
 
 	//   ████████  ████████  ████████   ██████  ██    ██
 	//   ██        ██           ██     ██       ██    ██
-	//   ██████    ██████       ██     ██       ████████
+	//   ███████   ██████       ██     ██       ████████
 	//   ██        ██           ██     ██       ██    ██
 	//   ██        ████████     ██      ██████  ██    ██
 
@@ -575,8 +574,6 @@ module RISCV #(
 		product[15:0]  =                   term_1[15:0];
 /////////////////////////////////////////////////////////////////////////
 
-	wire step_div = divisor <= dividend;
-
 	// Value to be written back, according to the kind of instruction executed.
 	wire[31:0] final_value =
 		  execute_result
@@ -585,8 +582,8 @@ module RISCV #(
 /////////////////////////////////////////////////////////////////////////
 		| (take_mul ?       product[31:0]    : 0)
 		| (take_mulh ?      product[63:32]   : 0)
-		| (take_div ?       quotient         : 0)
-		| (take_rem ?       dividend         : 0);
+		| (take_div ?       (div_sign ? -quotient : quotient)         : 0)
+		| (take_rem ?       (div_sign ? -dividend : quotient)         : 0);
 
 	wire branch_result =
 		bltge ?         sleft <  sright   :
@@ -594,6 +591,18 @@ module RISCV #(
 
 	// Bit 12 determines if the comparison result must be reversed.
 	wire branch_mistaken = decode_inst[12] ^ branch_result != decode_branched;
+
+	wire step_division_1 = divisor <= dividend;
+
+	wire[31:0] next_dividend = step_division_1 ? dividend - divisor[31:0] : dividend;
+	wire[31:0] next_quotient = step_division_1 ? quotient | quotient_mask : quotient;
+
+	wire step_division_2 = (divisor >> 1) <= next_dividend;
+
+	wire[31:0] final_dividend = step_division_2 ? next_dividend - divisor[32:1]       : next_dividend;
+	wire[31:0] final_quotient = step_division_2 ? next_quotient | quotient_mask[31:1] : next_quotient;
+
+	bit div_sign;
 
 
 
@@ -606,16 +615,13 @@ module RISCV #(
 		end else if (dividing) begin
 			// TODO: only works for unsigned.
 			// TODO: very fragile and untested.
-			if (step_div) begin
-				dividend <= dividend - divisor[31:0];
-				quotient <= quotient | quotient_mask;
+			dividend <= final_dividend;
+			quotient <= final_quotient;
 
-			end
+			quotient_mask <= quotient_mask >> 2;
+			divisor <= divisor >> 2;
 
-			quotient_mask <= quotient_mask >> 1;
-			divisor <= divisor >> 1;
-
-			dividing <= quotient_mask > 1;
+			dividing <= |quotient_mask[31:2];
 
 		end else if (stall_execute) begin
 			// Do nothing...
@@ -638,11 +644,12 @@ module RISCV #(
 
 			// TODO: only works for unsigned.
 			// TODO: very fragile and untested.
-			dividend <= uleft;
-			divisor <= uright << 31;
+			dividend <= sleft[32] ? -uleft : uleft;
+			divisor <= (sright[32] ? -uright : uright) << 31;
 			quotient <= 0;
 			quotient_mask <= 1<<31;
 			dividing <= div || rem;
+			div_sign <= sleft[32] ^ sright[32];
 
 			take_mul <= mul;
 			take_mulh <= mulh;

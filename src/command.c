@@ -3,6 +3,18 @@
 #include "graphics.h"
 
 void
+cmd_wait_1s(void)
+{
+	spin_cycles(103333333);
+}
+
+void
+cmd_wait_10s(void)
+{
+	spin_cycles(10 * 103333333);
+}
+
+void
 cmd_csr_cycle(void)
 {
 	print(ICELINK, "0x%x\r\n", read_cycle());
@@ -20,125 +32,161 @@ cmd_csr_instret(void)
 	print(ICELINK, "0x%x\r\n", read_instret());
 }
 
-// void
-// cmd_sdram_read(void)
-// {
-// 	SDRAM[0U];
-// 	print(ICELINK, "@0x%x : 0x%x\r\n", 0U, SDRAM[0U]);
-// }
-
-// void
-// cmd_sdram_write(void)
-// {
-// 	SDRAM[0U] = 0xCAFEU;
-// }
-
-// void
-// cmd_sdram_clear(void)
-// {
-// 	for (unsigned addr = 0U; addr < 0x400000U; addr++)
-// 		SDRAM[addr] = 0U;
-// }
-
-// void
-// cmd_sdram_fill(void)
-// {
-// 	unsigned state = 0xDEADBEEFU;
-
-// 	for (unsigned addr = 0U; addr < 0x400000U; addr++)
-// 		SDRAM[addr] = state = next_xorshift(state);
-// }
-
-// void
-// cmd_sdram_check(void)
-// {
-// 	unsigned state = 0xDEADBEEFU;
-// 	unsigned failed = 0U;
-
-// 	for (unsigned addr = 0U; addr < 0x400000U; addr++) {
-// 		const unsigned read_value = SDRAM[addr];
-// 		state = next_xorshift(state);
-
-// 		if (read_value != (unsigned short)state) {
-// 			print(
-// 				ICELINK,
-// 				"Mismatch @0x%x (expected 0x%x, got 0x%x)\r\n",
-// 				addr,
-// 				(unsigned short)state,
-// 				read_value);
-
-// 			failed++;
-// 		}
-// 	}
-// }
-
 void
 cmd_video_clear(void)
 {
-	clear_screen(0U);
-}
-
-static char atlas[] = {
-#include "../build/atlas.h"
-};
-
-void
-cmd_video_tri(void)
-{
-
-	Vec2 xy, uv;
-	unsigned random, color;
-
-	random = xorshift();
-	color = random & 0xFFFFFF;
-	random = xorshift();
-	xy.x = (random & 0xFFU) % 160U;
-	random >>= 8U;
-	xy.y = (random & 0xFFU) % 120U;
-	uv = (Vec2) { 0, 0 };
-	Vert2 a = { xy, uv, color };
-
-	random = xorshift();
-	color = random & 0xFFFFFF;
-	random = xorshift();
-	xy.x = (random & 0xFFU) % 160U;
-	random >>= 8U;
-	xy.y = (random & 0xFFU) % 120U;
-	uv = (Vec2) { 0, 16 };
-	Vert2 b = { xy, uv, color };
-
-	random = xorshift();
-	color = random & 0xFFFFFF;
-	random = xorshift();
-	xy.x = (random & 0xFFU) % 160U;
-	random >>= 8U;
-	xy.y = (random & 0xFFU) % 120U;
-	uv = (Vec2) { 16, 0 };
-	Vert2 c = { xy, uv, color };
-
-	char *tex = random & 0x800000 ? atlas : NULL;
-
-	draw_triangle((Tri2) { tex, a, b, c });
+	fill_screen(0U);
 }
 
 void
-cmd_video_tris(void)
+cmd_video_fill(void)
 {
-	for (int idx = 0; idx < 1000; idx++)
-		cmd_video_tri();
+	fill_screen(xorshift());
 }
 
 void
 cmd_video_hello(void)
 {
-	draw_triangle((Tri2) { NULL,  {{ 32,  12}, {}, 0x0000FF}, {{ 32, 108}, {}, 0x00FF00}, {{128,  12}, {}, 0xFF0000} });
-	draw_triangle((Tri2) { atlas, {{128, 108}, { 0, 16}},     {{128,  12}, {16,  0}},     {{ 32, 108}, {16, 16}} });
+	// raster_triangle((Triangle) {
+	// 	{ { FIX(160), FIX(100), 0 }, { 0x1F0000, 0 } },
+	// 	{ { FIX(  0), FIX(100), 0 }, { 0x001F00, 0 } },
+	// 	{ { FIX(160), FIX(  0), 0 }, { 0x00001F, 0 } },
+	// });
+	// raster_triangle((Triangle) {
+	// 	{ { FIX(  0), FIX(  0), 0 }, { 0x1F0000, 0 } },
+	// 	{ { FIX(160), FIX(  0), 0 }, { 0x001F00, 0 } },
+	// 	{ { FIX(  0), FIX(100), 0 }, { 0x00001F, 0 } },
+	// });
+
+	// raster_triangle((Triangle) {
+	// 	{ { FIX(10),      FIX(10),      0 }, { 0x1F0000, 0 } },
+	// 	{ { FIX(10),      FIX(10 + 30), 0 }, { 0x00001F, 0 } },
+	// 	{ { FIX(10 + 30), FIX(10),      0 }, { 0x001F00, 0 } },
+	// });
+	// raster_triangle((Triangle) {
+	// 	{ { FIX(20),     FIX(12),     0 }, { 0x001F00, 0 } },
+	// 	{ { FIX(20),     FIX(12 + 5), 0 }, { 0x1F0000, 0 } },
+	// 	{ { FIX(20 + 5), FIX(12),     0 }, { 0x00001F, 0 } },
+	// });
+	// raster_triangle((Triangle) {
+	// 	{ { FIX(30),     FIX(22),     0 }, { 0x00001F, 0 } },
+	// 	{ { FIX(30),     FIX(22 - 5), 0 }, { 0x001F00, 0 } },
+	// 	{ { FIX(30 - 5), FIX(22),     0 }, { 0x1F0000, 0 } },
+	// });
+
+	// raster_triangle((Triangle) {
+	// 	{ { FIX( 80), FIX( 25), 0 }, { 0x1F0000, 0 } },
+	// 	{ { FIX( 80), FIX( 75), 0 }, { 0x001F00, 0 } },
+	// 	{ { FIX( 30), FIX( 25), 0 }, { 0x00001F, 0 } },
+	// });
+	// raster_triangle((Triangle) {
+	// 	{ { FIX( 80), FIX( 25), 0 }, { 0x1F0000, 0 } },
+	// 	{ { FIX(130), FIX( 25), 0 }, { 0x001F00, 0 } },
+	// 	{ { FIX( 80), FIX( 75), 0 }, { 0x00001F, 0 } },
+	// });
+
+	// raster_triangle((Triangle) {
+	// 	{ { FIX( 48), FIX( 18), FIX(10) }, { FIX(  0), FIX(  0) } },
+	// 	{ { FIX(112), FIX( 18), FIX(19) }, { FIX(128), FIX(  0) } },
+	// 	{ { FIX( 48), FIX( 82), FIX(10) }, { FIX(  0), FIX(128) } },
+	// });
+	// raster_triangle((Triangle) {
+	// 	{ { FIX(112), FIX( 82), 0 },  { FIX(128), FIX(128) } },
+	// 	{ { FIX( 48), FIX( 82), 0 },  { FIX(  0), FIX(128) } },
+	// 	{ { FIX(112), FIX( 18), 0 },  { FIX(128), FIX(  0) } },
+	// });
+
+	raster_triangle((Triangle) {
+		{ { FIX( -1), FIX( -1), FIX(2) }, { FIX(  0), FIX(  0) } },
+		{ { FIX(  1), FIX( -1), FIX(4) }, { FIX(128), FIX(  0) } },
+		{ { FIX( -1), FIX(  1), FIX(2) }, { FIX(  0), FIX(128) } },
+	});
+	raster_triangle((Triangle) {
+		{ { FIX(  1), FIX(  1), FIX(4) }, { FIX(128), FIX(128) } },
+		{ { FIX( -1), FIX(  1), FIX(2) }, { FIX(  0), FIX(128) } },
+		{ { FIX(  1), FIX( -1), FIX(4) }, { FIX(128), FIX(  0) } },
+	});
 }
 
+static const Triangle model[] = {
+	{
+		{ { FIX(-50), FIX( 10), FIX(10) }, { FIX(  0), FIX(  0) } },
+		{ { FIX(-30), FIX( 10), FIX(10) }, { FIX(128), FIX(  0) } },
+		{ { FIX(-50), FIX(-10), FIX(10) }, { FIX(  0), FIX(128) } },
+	},
+	{
+		{ { FIX(-30), FIX(-10), FIX(10) }, { FIX(128), FIX(128) } },
+		{ { FIX(-50), FIX(-10), FIX(10) }, { FIX(  0), FIX(128) } },
+		{ { FIX(-30), FIX( 10), FIX(10) }, { FIX(128), FIX(  0) } },
+	},
+	{
+		{ { FIX(-30), FIX( 10), FIX(10) }, { FIX(  0), FIX(  0) } },
+		{ { FIX(-30), FIX( 10), FIX(30) }, { FIX(128), FIX(  0) } },
+		{ { FIX(-30), FIX(-10), FIX(10) }, { FIX(  0), FIX(128) } },
+	},
+	{
+		{ { FIX(-30), FIX(-10), FIX(30) }, { FIX(128), FIX(128) } },
+		{ { FIX(-30), FIX(-10), FIX(10) }, { FIX(  0), FIX(128) } },
+		{ { FIX(-30), FIX( 10), FIX(30) }, { FIX(128), FIX(  0) } },
+	},
+};
+
 void
-cmd_wait_10s(void)
+cmd_video_demo(void)
 {
-	spin_cycles(10 * 62000000);
+	Vec3 pov = { FIX(0), FIX(0), FIX(0) };
+	uvlong then = read_time();
+	char aim = '\0';
+	int i = 0;
+
+	for (;;) {
+		const uvlong now = read_time();
+		const int dt = now - then;
+
+		if (ICELINK->full)
+			aim = ICELINK->data;
+
+		if (!OUIJA->v_blank)
+			continue;
+
+		then = now;
+		// fill_screen(0U);
+
+#define FACTOR   200
+
+		fix dx = 0;
+		fix dy = 0;
+		fix dz = 0;
+
+		switch (aim) {
+		case 'w':
+			dz += dt / FACTOR;
+			break;
+
+		case 'a':
+			dx -= dt / FACTOR;
+			break;
+
+		case 's':
+			dz -= dt / FACTOR;
+			break;
+
+		case 'd':
+			dx += dt / FACTOR;
+			break;
+		}
+
+		pov.x += dx;
+		pov.y += dy;
+		pov.z += dz;
+
+		if (i++ == 100) {
+			print(ICELINK, "%q %q %q %x %x %x %x\r\n", pov.x, pov.y, pov.z, dt, dx, dy, dz);
+			i = 0;
+		}
+
+		render_model(model, NELEMS(model), pov);
+	}
 }
 
 void
@@ -182,21 +230,17 @@ static const struct {
 	const char *name;
 	Command *proc;
 } COMMANDS[] = {
-	{ "csr/cycle",     cmd_csr_cycle },
-	{ "csr/time",      cmd_csr_time },
-	{ "csr/instret",   cmd_csr_instret },
-	// { "sdram/read",    cmd_sdram_read },
-	// { "sdram/write",   cmd_sdram_write },
-	// { "sdram/clear",   cmd_sdram_clear },
-	// { "sdram/fill",    cmd_sdram_fill },
-	// { "sdram/check",   cmd_sdram_check },
-	{ "video/clear",   cmd_video_clear },
-	{ "video/tri",     cmd_video_tri },
-	{ "video/tris",    cmd_video_tris },
-	{ "video/hello",   cmd_video_hello },
-	{ "wait/10s",      cmd_wait_10s },
-	{ "plot",          cmd_plot },
-	{ "random",        cmd_random },
+	{ "wait/1s",     cmd_wait_1s },
+	{ "wait/10s",    cmd_wait_10s },
+	{ "csr/cycle",   cmd_csr_cycle },
+	{ "csr/time",    cmd_csr_time },
+	{ "csr/instret", cmd_csr_instret },
+	{ "video/clear", cmd_video_clear },
+	{ "video/fill",  cmd_video_fill },
+	{ "video/hello", cmd_video_hello },
+	{ "video/demo",  cmd_video_demo },
+	{ "plot",        cmd_plot },
+	{ "random",      cmd_random },
 };
 
 Command *

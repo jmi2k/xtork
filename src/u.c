@@ -12,7 +12,7 @@ static const char DIGITS[] = {
 int
 init(void)
 {
-	ICELINK->divisor = 77500000U / BAUDS;
+	ICELINK->divisor = 103333333U / BAUDS;
 	spin_cycles(100);
 
 	return 0;
@@ -166,6 +166,14 @@ put_string(Uart *const uart, const char str[])
 }
 
 void
+put_fixed_point(Uart *const uart, const fix val)
+{
+	put_hexadecimal(uart, INT(val), 0);
+	put_char(uart, '.');
+	put_hexadecimal(uart, FRACT(val), 4);
+}
+
+void
 print(Uart *const uart, const char *fmt, ...)
 {
 	va_list args;
@@ -181,25 +189,31 @@ print(Uart *const uart, const char *fmt, ...)
 		// Interpret print sequences.
 		switch (*++fmt) {
 		case 'c': {
-			const unsigned arg = va_arg(args, const unsigned);
+			const unsigned arg = va_arg(args, const uint);
 			put_char(uart, (char)arg);
 			break;
 		}
 
 		case 'd': {
-			const unsigned arg = va_arg(args, const unsigned);
+			const unsigned arg = va_arg(args, const uint);
 			put_decimal(uart, arg, 0);
 			break;
 		}
 
+		case 'q': {
+			const unsigned arg = va_arg(args, const fix);
+			put_fixed_point(uart, arg);
+			break;
+		}
+
 		case 'o': {
-			const unsigned arg = va_arg(args, const unsigned);
+			const unsigned arg = va_arg(args, const uint);
 			put_octal(uart, arg, 0);
 			break;
 		}
 
 		case 'x': {
-			const unsigned arg = va_arg(args, const unsigned);
+			const unsigned arg = va_arg(args, const uint);
 			put_hexadecimal(uart, arg, 0);
 			break;
 		}

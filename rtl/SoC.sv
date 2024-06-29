@@ -7,10 +7,10 @@
 // `define PING_PONG_2
 
 `include "rtl/types.svh"
-`include "rtl/BRAM.sv"
+`include "rtl/BRAM_delayed_ports.sv"
 `include "rtl/RISCV.sv"
 `include "rtl/UART.sv"
-`include "rtl/Video.sv"
+`include "rtl/Video_reborn.sv"
 
 module SoC(
 	// 25 MHz
@@ -28,24 +28,24 @@ module SoC(
 	wire bus_clock;
 
 	// 77.5 MHz
-	OSCG #(4) osc(bus_clock);
+	OSCG #(3) osc(bus_clock);
 `else
 	bit bus_clock = 0;
 
 	// 77.5 MHz
-	always #(1s / (310e6/4) / 2)
+	always #(1s / (310e6/3) / 2)
 		bus_clock <= !bus_clock;
 `endif
 
 	// Video adapter.
-	wire RGB_444 pixel;
+	wire RGB_666 color;
 	wire[1:0] sync;
 
 	assign port_2 = {
-		pixel.b[3], pixel.b[2], pixel.b[1], pixel.b[0],
-		pixel.r[3], pixel.r[2], pixel.r[1], pixel.r[0],
+		color.b[2], color.b[3], color.b[4], color.b[5],
+		color.r[2], color.r[3], color.r[4], color.r[5],
 		!sync[0],   !sync[1],   1'bx,       1'bx,
-		pixel.g[3], pixel.g[2], pixel.g[1], pixel.g[0]
+		color.g[2], color.g[3], color.g[4], color.g[5]
 	};
 
 	// Instruction port
@@ -94,7 +94,7 @@ module SoC(
 
 	BRAM #(
 		.FILE("build/firmware.hex"),
-		.NUM_WORDS(4_096),
+		.NUM_WORDS(8_192),
 		.BYTE_BITS(8),
 		.BYTES_PER_WORD(4)
 	) ram(
@@ -139,14 +139,15 @@ module SoC(
 		.BYTE_BITS(8),
 		.BYTES_PER_WORD(4),
 
+		.ATLAS("build/res/dingus_nowhiskers.666.hex"),
 		// The board clock is slightly slower than the VGA standard dictates.
 		// Making the vertical blanking interval shorter compensates that.
 		.V_FP(9),
 		.V_SYNC(2),
 		.V_BP(31)
 	) video(
-		.pixel_clock(board_clock),
-		.pixel,
+		.beam_clock(board_clock),
+		.color,
 		.sync,
 
 		.bus_clock,

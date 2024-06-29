@@ -2,10 +2,7 @@
 
 .global _start
 _start:
-	li      a0, 100
-	li      a1, 10
-	div     a2, a0, a1
-	li      sp, 0x4000
+	li      sp, 0x8000
 	call    init
 	call    main
 	j       .

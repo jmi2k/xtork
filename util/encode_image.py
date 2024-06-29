@@ -8,16 +8,23 @@ from sys import stderr, stdout
 def batched(blob, n):
     return (blob[i*n : (i+1)*n] for i in range(len(blob) // n))
 
-def downsample(byte, noise):
+def downsample_4bpc(byte, noise):
+    if noise:
+        # Partial dithering to smooth color bands
+        byte += next(noise)//16 - 8
+
+    return sorted([0, byte, 255])[1] >> 4
+
+def downsample_6bpc(byte, noise):
     if noise:
         # Partial dithering to smooth color bands
         byte += next(noise)//64 - 2
 
-    return sorted([0, dithered, 255])[1] >> 4
+    return sorted([0, byte, 255])[1] >> 2
 
 def rgb444(image, noise):
     blob = image.convert('RGB').tobytes()
-    blob = [downsample(byte, noise) for byte in blob]
+    blob = [downsample_4bpc(byte, noise) for byte in blob]
     encoded = bytearray()
     hexads = batched(blob, 6)
 
@@ -28,9 +35,25 @@ def rgb444(image, noise):
 
     return encoded
 
+def rgb666(image, noise):
+    foo = image.point(lambda p: p & 0xF0)
+    foo.save("test.png")
+    blob = image.convert('RGB').tobytes()
+    blob = [downsample_6bpc(byte, noise) for byte in blob]
+    encoded = bytearray()
+    pixels = batched(blob, 3)
+
+    for r, g, b in pixels:
+        encoded.append(0b11000000 & (g << 6) | b)
+        encoded.append(0b11110000 & (r << 4) | g >> 2)
+        encoded.append(r >> 4)
+        encoded.append(0)
+
+    return encoded
+
 def soi444(image, noise):
     blob = image.convert('RGB').tobytes()
-    blob = [downsample(byte, noise) for byte in blob]
+    blob = [downsample_4bpc(byte, noise) for byte in blob]
     encoded = bytearray()
     pixels = batched(blob, 3)
     cache = [None for _ in range(32)]
@@ -76,7 +99,7 @@ def sixel(image, noise):
 
     for band in bands:
         for hexad in band:
-            column = 0;
+            column = 0
 
             column |= int(hexad[0] > 0)
             column |= int(hexad[1] > 0) << 1
@@ -95,6 +118,7 @@ def sixel(image, noise):
 ENCODINGS = {
     'RGB': lambda image, _: image.convert('RGB').tobytes(),
     'RGB444': rgb444,
+    'RGB666': rgb666,
     'SOI444': soi444,
     'Sixel': sixel,
 }

@@ -1,7 +1,29 @@
 #include "u.h"
 #include "graphics.h"
 
-static int
+inline fix
+fix_mul(const fix l, const fix r)
+{
+	vlong product = (vlong)l * (int)r;
+	return (product + 0x8000) >> 16;
+}
+
+void
+fill_screen(const Color color)
+{
+	for (int pos = 0; pos < 320*200; pos += 8) {
+		FRAME[pos + 0] = color;
+		FRAME[pos + 1] = color;
+		FRAME[pos + 2] = color;
+		FRAME[pos + 3] = color;
+		FRAME[pos + 4] = color;
+		FRAME[pos + 5] = color;
+		FRAME[pos + 6] = color;
+		FRAME[pos + 7] = color;
+	}
+}
+
+inline int
 is_top_left(Vec2 start, Vec2 end) {
 	Vec2 edge = { end.x - start.x, end.y - start.y };
 	int is_top_edge = edge.y == 0 && edge.x > 0;
@@ -10,208 +32,171 @@ is_top_left(Vec2 start, Vec2 end) {
 	return is_left_edge || is_top_edge;
 }
 
-static int
+inline int
 edge_cross(Vec2 a, Vec2 b, Vec2 p) {
 	Vec2 ab = { b.x - a.x, b.y - a.y };
 	Vec2 ap = { p.x - a.x, p.y - a.y };
 
-	return ab.x * ap.y - ab.y * ap.x;
+	return fix_mul(ab.x, ap.y) - fix_mul(ab.y, ap.x);
 }
 
 void
-clear_screen(const unsigned short color)
+render_model(const Triangle model[], const int len, const Vec3 pov)
 {
-	for (int y = 0U; y < 120; y++)
-	for (int x = 0U; x < 160; x++)
-		draw_pixel((Vec2) { x, y }, color);
-}
+	for (int pos = 0; pos < len; pos++) {
+		Triangle tri = model[pos];
+		// Tri2 tri_2;
 
-void
-draw_pixel(const Vec2 p, const unsigned short color)
-{
-	VIDEO[160U*p.y + p.x] = color;
-}
+		// fix a_x = tri_3.a.xyz.x - pov.x;
+		// fix a_y = tri_3.a.xyz.y - pov.y;
+		// fix a_z = tri_3.a.xyz.z - pov.z;
 
-// Padded and shifted table made from:
-//
-// def srgb2linear(v):
-//     if v > 0.0031308:
-//         return 1.055 * (pow(v, 1. / 2.4)) - 0.05499999999999999
-//     else:
-//         return 12.92 * v
-//
-// table = [int(0xFF * srgb2linear(n / 0xFF)) for n in range(0x100)]
-//
-// for y in range(32):
-//     line = ", ".join(["0x{:02X}".format(n) for n in table[8*y:8*y+8]])
-//     print(f"\t{line}")
+		// fix b_x = tri_3.b.xyz.x - pov.x;
+		// fix b_y = tri_3.b.xyz.y - pov.y;
+		// fix b_z = tri_3.b.xyz.z - pov.z;
 
-static const char srgb2linear[288] = {
-	// 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-	0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		// fix c_x = tri_3.c.xyz.x - pov.x;
+		// fix c_y = tri_3.c.xyz.y - pov.y;
+		// fix c_z = tri_3.c.xyz.z - pov.z;
 
-	0x0, 0x0, 0x1, 0x1, 0x2, 0x2, 0x2, 0x2,
-	0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x4, 0x4,
-	0x4, 0x4, 0x4, 0x4, 0x4, 0x5, 0x5, 0x5,
-	0x5, 0x5, 0x5, 0x5, 0x5, 0x5, 0x6, 0x6,
-	0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6, 0x6,
-	0x6, 0x6, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7,
-	0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7,
-	0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8,
-	0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8,
-	0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9,
-	0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9, 0x9,
-	0x9, 0x9, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA,
-	0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA,
-	0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xB,
-	0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB,
-	0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB,
-	0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0xC,
-	0xC, 0xC, 0xC, 0xC, 0xC, 0xC, 0xC, 0xC,
-	0xC, 0xC, 0xC, 0xC, 0xC, 0xC, 0xC, 0xC,
-	0xC, 0xC, 0xC, 0xC, 0xC, 0xC, 0xC, 0xC,
-	0xC, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD,
-	0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD,
-	0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD,
-	0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xD, 0xE,
-	0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE,
-	0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE,
-	0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE,
-	0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xE, 0xF,
-	0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
-	0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
-	0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
-	0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
+		// fix a_z_inv = 0xFFFFFFFFU / (unsigned)a_z + 1;
+		// fix b_z_inv = 0xFFFFFFFFU / (unsigned)b_z + 1;
+		// fix c_z_inv = 0xFFFFFFFFU / (unsigned)c_z + 1;
 
-	0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
-	// 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
-};
+		// fix fov = 0x100;
 
-void
-draw_triangle(const Tri2 tri)
-{
-	const Vec2 b = tri.b.xy;
-	Vec2 a, c;
+		// tri_2.a.xy.x = FIX(160) + fix_mul(fix_mul(fov, a_x), a_z_inv);
+		// tri_2.a.xy.y = FIX(100) - fix_mul(fix_mul(fov, a_y), a_z_inv);
 
-	if ((tri.b.xy.x - tri.a.xy.x)*(tri.c.xy.y - tri.a.xy.y) - (tri.c.xy.x - tri.a.xy.x)*(tri.b.xy.y - tri.a.xy.y) > 0) {
-		a = tri.a.xy;
-		c = tri.c.xy;
-	} else {
-		a = tri.c.xy;
-		c = tri.a.xy;
+		// tri_2.b.xy.x = FIX(160) + fix_mul(fix_mul(fov, b_x), b_z_inv);
+		// tri_2.b.xy.y = FIX(100) - fix_mul(fix_mul(fov, b_y), b_z_inv);
+
+		// tri_2.c.xy.x = FIX(160) + fix_mul(fix_mul(fov, c_x), c_z_inv);
+		// tri_2.c.xy.y = FIX(100) - fix_mul(fix_mul(fov, c_y), c_z_inv);
+		OUIJA->matrix.i = (Vec4) { FIX(100.0), FIX(  0.0), FIX(  0.0),   -pov.x };
+		OUIJA->matrix.j = (Vec4) { FIX(  0.0), FIX(100.0), FIX(  0.0),   -pov.y };
+		OUIJA->matrix.k = (Vec4) { FIX(  0.0), FIX(  0.0), FIX(  0.0),   -pov.z };
+		OUIJA->matrix.l = (Vec4) { FIX(  0.0), FIX(  0.0), FIX(  1.0), FIX(1.0) };
+
+		raster_triangle(tri);
 	}
+}
 
-	unsigned ar =  tri.a.color         & 0xFF;
-	unsigned ag = (tri.a.color >>  8U) & 0xFF;
-	unsigned ab = (tri.a.color >> 16U) & 0xFF;
+fix
+fix_reciprocal(const fix f)
+{
+	return 0xFFFFFFFFU / (uint)f + 1U;
+}
 
-	unsigned br =  tri.b.color         & 0xFF;
-	unsigned bg = (tri.b.color >>  8U) & 0xFF;
-	unsigned bb = (tri.b.color >> 16U) & 0xFF;
+void
+raster_triangle(const Triangle tri)
+{
+	// const Vec2 b = tri.b.xy;
+	// const Vec2 a = tri.a.xy;
+	// const Vec2 c = tri.c.xy;
 
-	unsigned cr =  tri.c.color         & 0xFF;
-	unsigned cg = (tri.c.color >>  8U) & 0xFF;
-	unsigned cb = (tri.c.color >> 16U) & 0xFF;
+	// // Finds the bounding box with all candidate pixels
+	// fix x_min = MIN(MIN(a.x, b.x), c.x);
+	// fix y_min = MIN(MIN(a.y, b.y), c.y);
+	// fix x_max = MAX(MAX(a.x, b.x), c.x);
+	// fix y_max = MAX(MAX(a.y, b.y), c.y);
 
-	unsigned au = tri.a.uv.x;
-	unsigned av = tri.a.uv.y;
+	// // Compute the constant delta_s that will be used for the horizontal and vertical steps
+	// fix dc_0 = (b.y - c.y);
+	// fix dc_1 = (c.y - a.y);
+	// fix dc_2 = (a.y - b.y);
+	// fix dr_0 = (c.x - b.x);
+	// fix dr_1 = (a.x - c.x);
+	// fix dr_2 = (b.x - a.x);
 
-	unsigned bu = tri.b.uv.x;
-	unsigned bv = tri.b.uv.y;
+	// // Rasterization fill convention (top-left rule)
+	// fix bias0 = is_top_left(b, c) ? 0 : -1;
+	// fix bias1 = is_top_left(c, a) ? 0 : -1;
+	// fix bias2 = is_top_left(a, b) ? 0 : -1;
 
-	unsigned cu = tri.c.uv.x;
-	unsigned cv = tri.c.uv.y;
+	// // Compute the edge functions for the fist (top-left) point
+	// Vec2 p0 = { x_min, y_min };
+	// fix w0_row = edge_cross(b, c, p0) + bias0;
+	// fix w1_row = edge_cross(c, a, p0) + bias1;
+	// fix w2_row = edge_cross(a, b, p0) + bias2;
 
-	// Finds the bounding box with all candidate pixels
-	int x_min = MIN(MIN(a.x, b.x), c.x);
-	int y_min = MIN(MIN(a.y, b.y), c.y);
-	int x_max = MAX(MAX(a.x, b.x), c.x);
-	int y_max = MAX(MAX(a.y, b.y), c.y);
+	// fix area = edge_cross(a, b, c);
 
-	// Compute the constant delta_s that will be used for the horizontal and vertical steps
-	int delta_w0_col = (b.y - c.y);
-	int delta_w1_col = (c.y - a.y);
-	int delta_w2_col = (a.y - b.y);
-	int delta_w0_row = (c.x - b.x);
-	int delta_w1_row = (a.x - c.x);
-	int delta_w2_row = (b.x - a.x);
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(1), fix_reciprocal(FIX(1)));
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(2), fix_reciprocal(FIX(2)));
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(3), fix_reciprocal(FIX(3)));
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(4), fix_reciprocal(FIX(4)));
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(5), fix_reciprocal(FIX(5)));
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(6), fix_reciprocal(FIX(6)));
+	// // print(ICELINK, "x = %q = 1 / %q\r\n", FIX(7), fix_reciprocal(FIX(7)));
 
-	// Rasterization fill convention (top-left rule)
-	int bias0 = is_top_left(b, c) ? 0 : -1;
-	int bias1 = is_top_left(c, a) ? 0 : -1;
-	int bias2 = is_top_left(a, b) ? 0 : -1;
+	// // print(ICELINK, "");
 
-	// Compute the edge functions for the fist (top-left) point
-	Vec2 p0 = { x_min, y_min };
-	int w0_row = edge_cross(b, c, p0) + bias0;
-	int w1_row = edge_cross(c, a, p0) + bias1;
-	int w2_row = edge_cross(a, b, p0) + bias2;
+	// print(ICELINK, "%q = 1 / %q\r\n", area, fix_reciprocal(area));
+	// print(ICELINK, "%q = 1 / %q\r\n", INT(area), fix_reciprocal(INT(area)));
 
-	int area = edge_cross(a, b, c);
-	unsigned long long area_recip = 0xFFFFFFFFU / (unsigned)area + 1;
+	// // xxx
+	// OUIJA->x_min = INT(x_min);
+	// OUIJA->x_max = INT(x_max);
+	// OUIJA->y_min = INT(y_min);
+	// OUIJA->y_max = INT(y_max);
 
-	// Loop all candidate pixels inside the bounding box
-	for (int y = y_min; y <= y_max; y++) {
-		int w0 = w0_row;
-		int w1 = w1_row;
-		int w2 = w2_row;
+	// // This exploits the fact that:
+	// //
+	// //     1.0 / X.0 = 0.Y <=> 1.0 / 0.X = Y.0
+	// //
+	// // Example:
+	// //
+	// //     1.0 / 2.0 = 0.5 <=> 1.0 / 0.2 = 5.0
+	// //
+	// // The advantage of doing this is a more precise reciprocal value.
+	// //
+	// OUIJA->reciprocal = fix_reciprocal(INT(area));
 
-		int last_was_inside = 0;
+	// OUIJA->iw_0 = w0_row;
+	// OUIJA->iw_1 = w1_row;
+	// OUIJA->iw_2 = w2_row;
+	// OUIJA->dc_0 = dc_0;
+	// OUIJA->dc_1 = dc_1;
+	// OUIJA->dc_2 = dc_2;
+	// OUIJA->dr_0 = dr_0;
+	// OUIJA->dr_1 = dr_1;
+	// OUIJA->dr_2 = dr_2;
 
-		for (int x = x_min; x <= x_max; x++) {
-			int is_inside = (w0 | w1 | w2) >= 0;
+	// OUIJA->matrix.i = (Vec4) { FIX(160.0), FIX(  0.0), FIX(  0.0), FIX(   80.0) };
+	// OUIJA->matrix.j = (Vec4) { FIX(  0.0), FIX(100.0), FIX(  0.0), FIX(   50.0) };
+	// OUIJA->matrix.k = (Vec4) { FIX(  0.0), FIX(  0.0),    0x10008, FIX(-4096.5) };
+	// OUIJA->matrix.l = (Vec4) { FIX(  0.0), FIX(  0.0), FIX(  1.0), FIX(    0.0) };
+	OUIJA->matrix.i = (Vec4) { FIX(100.0), FIX(  0.0), FIX(  0.0), FIX(    0.0) };
+	OUIJA->matrix.j = (Vec4) { FIX(  0.0), FIX(100.0), FIX(  0.0), FIX(    0.0) };
+	OUIJA->matrix.k = (Vec4) { FIX(  0.0), FIX(  0.0), FIX(  0.0), FIX(    0.0) };
+	OUIJA->matrix.l = (Vec4) { FIX(  0.0), FIX(  0.0), FIX(  1.0), FIX(    0.0) };
+	OUIJA->triangle = tri;
 
-			if (is_inside) {
-				Vec2 p = { x, y };
+	while (OUIJA->busy) {}
+	OUIJA->fire = 1;
 
-				// Dithering
-				int random = xorshift();
-				int noise =  random & 0xF;
+				// int alpha = (unsigned long long)(256*w0)*area_recip >> 32U;
+				// int beta  = (unsigned long long)(256*w1)*area_recip >> 32U;
+				// int gamma = (unsigned long long)(256*w2)*area_recip >> 32U;
 
-				// TODO: 256 or 255?
-				int alpha = (unsigned long long)(256*w0)*area_recip >> 32U;
-				int beta  = (unsigned long long)(256*w1)*area_recip >> 32U;
-				int gamma = (unsigned long long)(256*w2)*area_recip >> 32U;
+				// unsigned r, g, b;
 
-				unsigned r, g, b;
+				// if (!tri.tex) {
+				// 	r = srgb2linear[(ar*alpha + br*beta + cr*gamma) >> 8U];
+				// 	g = srgb2linear[(ag*alpha + bg*beta + cg*gamma) >> 8U];
+				// 	b = srgb2linear[(ab*alpha + bb*beta + cb*gamma) >> 8U];
+				// } else {
+				// 	int u = (au*alpha + bu*beta + cu*gamma) >> 8U;
+				// 	int v = (av*alpha + bv*beta + cv*gamma) >> 8U;
 
-				if (!tri.tex) {
-					r = srgb2linear[((ar*alpha + br*beta + cr*gamma) >> 8U) + noise];
-					g = srgb2linear[((ag*alpha + bg*beta + cg*gamma) >> 8U) + noise];
-					b = srgb2linear[((ab*alpha + bb*beta + cb*gamma) >> 8U) + noise];
-				} else {
-					int u = (au*alpha + bu*beta + cu*gamma) >> 8U;
-					int v = (av*alpha + bv*beta + cv*gamma) >> 8U;
+				// 	int idx = 3*(32*u + v);
+				// 	int sr = tri.tex[idx];
+				// 	int sg = tri.tex[idx + 1];
+				// 	int sb = tri.tex[idx + 2];
 
-					int pos = 3*(32*u + v);
-					int sr = tri.tex[pos];
-					int sg = tri.tex[pos + 1];
-					int sb = tri.tex[pos + 2];
-
-					r = srgb2linear[sr + noise];
-					g = srgb2linear[sg + noise];
-					b = srgb2linear[sb + noise];
-				}
-
-				unsigned color = (r << 8) | (g << 4) | b;
-
-				draw_pixel(p, color);
-			} else if (last_was_inside) {
-				int x_remaining = x_max - x;
-				w0 += delta_w0_col * x_remaining;
-				w1 += delta_w1_col * x_remaining;
-				w2 += delta_w2_col * x_remaining;
-				break;
-			}
-
-			last_was_inside = is_inside;
-			w0 += delta_w0_col;
-			w1 += delta_w1_col;
-			w2 += delta_w2_col;
-		}
-
-		w0_row += delta_w0_row;
-		w1_row += delta_w1_row;
-		w2_row += delta_w2_row;
-	}
+				// 	r = srgb2linear[sr];
+				// 	g = srgb2linear[sg];
+				// 	b = srgb2linear[sb];
+				// }
 }

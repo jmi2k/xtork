@@ -67,8 +67,8 @@ main(void)
 	static char new_line[256U];
 	static char line[256U];
 
-	put_string(ICELINK, BANNER);
 	lookup_command("video/hello")();
+	put_string(ICELINK, BANNER);
 
 	for (;;) {
 		if (read_line(ICELINK, new_line, NELEMS(line), "⌂  "))
@@ -85,7 +85,7 @@ main(void)
 		command();
 
 		unsigned dt = read_time() - t;
-		print(ICELINK, "%d ms (%d cycles)\r\n", dt / 77500U, dt);
+		print(ICELINK, "%d ms (%d cycles)\r\n", dt / 103333U, dt);
 	}
 
 	return 0;

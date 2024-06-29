@@ -13,7 +13,7 @@ BAUDS = 921600
 VIDEO = /dev/video0
 
 rtl/SoC.sv: \
-	build/atlas.h \
+	build/res/dingus_nowhiskers.666.hex \
 	build/firmware.hex \
 	rtl/BRAM.sv \
 	rtl/RISCV.sv \
@@ -43,5 +43,11 @@ include sim/${SIM}.mk
 include bsp/${BOARD}.mk
 include src/firmware.mk
 
-build/%.h: res/%.png
-	python3 util/encode_image.py "$<" | xxd -i > "$@"
+build/res/%.666.hex: res/%.png
+	@mkdir -p `dirname "$@"`
+	python3 util/encode_image.py -e RGB666 -n res/blue_noise.png "$<" \
+	| od -v -A n -t x4 | sed 's/ 000/ /g' > "$@"
+
+build/res/%.h: res/%.obj
+	@mkdir -p `dirname "$@"`
+	python3 util/encode_obj.py "$<" > "$@"

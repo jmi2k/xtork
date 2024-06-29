@@ -15,14 +15,17 @@ build/%.hex: build/%.elf
 	| od -v -A n -t x4 > "$@"
 
 build/%.elf:
-	riscv64-unknown-elf-ld \
+	riscv64-unknown-elf-gcc \
 		-flto \
+		-mabi=ilp32 \
+		-march=${ISA} \
+		-mno-relax \
 		-nostdlib \
-		-b elf32-littleriscv \
-		-m elf32lriscv --no-relax \
+		-static-libgcc \
 		-o "$@" \
 		-T "${LDSCRIPT}" \
 		$^
+#		-lgcc
 
 build/src/%.o: src/%.[cS]
 	@mkdir -p `dirname "$@"`
@@ -30,7 +33,6 @@ build/src/%.o: src/%.[cS]
 		-c \
 		-DBAUDS=${BAUDS} \
 		-fno-builtin \
-		-static-libgcc \
 		-mabi=ilp32 \
 		-march=${ISA} \
 		-o "$@" \
